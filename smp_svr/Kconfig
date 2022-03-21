@@ -1,0 +1,15 @@
+# rsource "drivers/Kconfig"
+
+#menuconfig USER_INTERFACE
+#	   bool "user interface"
+
+#if USER_INTERFACE
+
+config NUMBER_OF_BUTTONS
+       int "Number of buttons to use"
+
+config UI_EVENT_QUEUE_SIZE
+       int "Number of events the user event queue can hold"
+
+source "Kconfig.zephyr"
+#endif

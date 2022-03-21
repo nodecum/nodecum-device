@@ -1,0 +1,49 @@
+/*
+	
+*/
+
+/ {
+	buttons {
+		// D5  is P1.08
+		// D6  is P0.07
+		// D7  is P1.02 (Button)
+		// D8  is P0.16 (NeoPixel)
+		// D9  is P0.26
+		// D10 is P0.27
+		/* GPIO D9 -> P0.26 */
+		buttonA: button_a {
+			gpios = <&gpio0 26 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "Push button A switch";
+		};
+		/* GPIO D6 -> P0.07 */
+		buttonB: button_b {
+			gpios = <&gpio0 7 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "Push button B switch";
+		};
+		/* GPIO D5 -> P1.08 */
+		buttonC: button_c {
+			gpios = <&gpio1 8 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "Push button C switch";
+		};
+		/* GPIO D10 -> P0.27 */
+		buttonR: button_r {
+			gpios = <&gpio0 27 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "Push button R switch";			
+		};
+	};
+};
+
+/ {
+	aliases {
+		sw1 = &buttonA;
+		sw2 = &buttonB;
+		sw3 = &buttonC;
+		sw4 = &buttonR;
+	};
+};
+
+/*
+Local Variables: 
+mode: dts
+End:
+*/
