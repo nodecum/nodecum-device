@@ -12,9 +12,6 @@ struct ui_evt_t {
 
 static struct ui_evt_t fifo_data[ CONFIG_UI_EVENT_QUEUE_SIZE];
 
-#define FIFO_ELEM_SZ     sizeof( struct ui_evt_t)
-#define FIFO_ELEM_ALIGN  sizeof( unsigned int)
-
 static struct k_fifo fifo_free;
 static struct k_fifo fifo_used; 
 

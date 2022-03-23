@@ -42,6 +42,7 @@ LOG_MODULE_REGISTER(smp_sample);
 
 #include "uievq.h"
 #include "buttons.h"
+#include "shell_cfb.h"
 
 /* The devicetree node identifier for the "led0" alias. */
 #define LED0_NODE DT_ALIAS(led0)
@@ -178,20 +179,21 @@ void main(void)
    */
   char buf[32]; 
   while (1) {
-    uint32_t ev = ui_evq_get( K_FOREVER);
-    int btn = FIELD_GET( BTN_NR_MASK, ev);
-    int state = FIELD_GET( BTN_STATE_BIT, ev);
+    shell_cfb_event_loop();
+    /* uint32_t ev = ui_evq_get( K_FOREVER); */
+    /* int btn = FIELD_GET( BTN_NR_MASK, ev); */
+    /* int state = FIELD_GET( BTN_STATE_BIT, ev); */
     
-    if (btn == 4 && state == 0) {
-      cfb_framebuffer_clear(dev, true);
-      cfb_framebuffer_finalize(dev);
-      gpio_pin_set(led0, PIN, 0);
-    } else {
-      cfb_framebuffer_clear(dev, false);
-      snprintf(buf, sizeof(buf), "%d, %d", btn, state);
-      cfb_print(dev, buf, 0, 0);
-      cfb_framebuffer_finalize(dev);
-      gpio_pin_set(led0, PIN, 1);	      
-    }
+    /* if (btn == 4 && state == 0) { */
+    /*   cfb_framebuffer_clear(dev, true); */
+    /*   cfb_framebuffer_finalize(dev); */
+    /*   gpio_pin_set(led0, PIN, 0); */
+    /* } else { */
+    /*   cfb_framebuffer_clear(dev, false); */
+    /*   snprintf(buf, sizeof(buf), "%d, %d", btn, state); */
+    /*   cfb_print(dev, buf, 0, 0); */
+    /*   cfb_framebuffer_finalize(dev); */
+    /*   gpio_pin_set(led0, PIN, 1);	       */
+    /*  } */
   }
 }
