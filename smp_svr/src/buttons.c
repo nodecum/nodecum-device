@@ -28,7 +28,8 @@ UTIL_LISTIFY( NR_OF_BUTTONS, BUTTON_SPEC);
   void btn##n( const struct device *gpio, struct gpio_callback* cb, uint32_t val) \
   {									\
     uint32_t ev = 0;							\
-    ev = FIELD_PREP( BTN_NR_MASK, (n));					\
+    ev = FIELD_PREP( EVENT_TYPE_MASK, BTN_EVENT)			\
+      | FIELD_PREP( BTN_NR_MASK, (n));					\
     int ret = gpio_pin_get( gpio, sw##n.pin);				\
     if (ret < 0) {							\
       LOG_ERR("Failed to get the state of port %s pin %u, error: %d",	\

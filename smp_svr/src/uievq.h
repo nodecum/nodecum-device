@@ -1,6 +1,9 @@
 /*
   user interface event queue
 */
+#include <sys/util.h>
+
+#define EVENT_TYPE_MASK GENMASK( 31, 29)
 
 void ui_evq_put( uint32_t);
 struct k_timeout_t;

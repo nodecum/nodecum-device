@@ -28,8 +28,8 @@ extern "C" {
     .api = &shell_cfb_transport_api,					\
     .ctx = (struct shell_cfb *)&_name##_shell_cfb			\
   }
-
-  void shell_cfb_event_loop( void);
+  int enable_shell_cfb( const struct device *arg);
+  void shell_cfb_event_loop( const struct device *cfb);
 #ifdef __cplusplus
 }
 #endif

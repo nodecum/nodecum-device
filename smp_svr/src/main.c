@@ -36,7 +36,7 @@
 
 #define LOG_LEVEL LOG_LEVEL_DBG
 #include <logging/log.h>
-LOG_MODULE_REGISTER(smp_sample);
+LOG_MODULE_REGISTER(smp_sample, LOG_LEVEL_DBG);
 
 #include "common.h"
 
@@ -148,6 +148,7 @@ void main(void)
   if (ret < 0) {
     return;
   }
+  gpio_pin_set(led0, PIN, 0);
   
   const struct device *dev;
 
@@ -171,15 +172,18 @@ void main(void)
   //cfb_framebuffer_invert(dev);
   cfb_framebuffer_clear(dev, true);
   display_blanking_off(dev);
+  cfb_framebuffer_finalize(dev);
   
   LOG_INF("build time: " __DATE__ " " __TIME__);
   
   /* The system work queue handles all incoming mcumgr requests.  Let the
    * main thread idle while the mcumgr server runs.
    */
-  char buf[32]; 
+  // char buf[32];
+  enable_shell_cfb(NULL);
   while (1) {
-    shell_cfb_event_loop();
+    k_sleep(Z_TIMEOUT_MS(1000));
+    shell_cfb_event_loop( dev);
     /* uint32_t ev = ui_evq_get( K_FOREVER); */
     /* int btn = FIELD_GET( BTN_NR_MASK, ev); */
     /* int state = FIELD_GET( BTN_STATE_BIT, ev); */
