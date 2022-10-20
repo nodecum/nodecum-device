@@ -82,6 +82,7 @@ build_smp:
 		-- -DOVERLAY_CONFIG="$(SRC_DIR_SMP)/overlay-bt.conf;$(SRC_DIR_SMP)/display.conf" \
 		   -DDTC_OVERLAY_FILE="$(SRC_DIR_SMP)/usb.overlay;$(SRC_DIR_SMP)/adafruit_feather_nrf52480.overlay;$(SRC_DIR_SMP)/ssd1306_128x32.overlay" 
 
+#-DSHIELD=ssd1306_128x32
 #$(SRC_DIR_SMP)/overlay-cdc.conf;
 
 sign_smp:

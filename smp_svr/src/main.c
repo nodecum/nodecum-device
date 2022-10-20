@@ -5,18 +5,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr.h>
-#include <stats/stats.h>
-#include <usb/usb_device.h>
-#include <drivers/gpio.h>
-#include <display/cfb.h>
+#include <zephyr/kernel.h>
+#include <zephyr/stats/stats.h>
+#include <zephyr/usb/usb_device.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/display/cfb.h>
 #include "cfb_font_magic5.h"
 
 #ifdef CONFIG_MCUMGR_CMD_FS_MGMT
-#include <device.h>
-#include <fs/fs.h>
+#include <zephyr/device.h>
+#include <zephyr/fs/fs.h>
 #include "fs_mgmt/fs_mgmt.h"
-#include <fs/littlefs.h>
+#include <zephyr/fs/littlefs.h>
 #endif
 #ifdef CONFIG_MCUMGR_CMD_OS_MGMT
 #include "os_mgmt/os_mgmt.h"
@@ -35,7 +35,7 @@
 #endif
 
 #define LOG_LEVEL LOG_LEVEL_DBG
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(smp_sample, LOG_LEVEL_DBG);
 
 #include "common.h"
@@ -43,22 +43,6 @@ LOG_MODULE_REGISTER(smp_sample, LOG_LEVEL_DBG);
 #include "uievq.h"
 #include "buttons.h"
 #include "shell_cfb.h"
-
-/* The devicetree node identifier for the "led0" alias. */
-#define LED0_NODE DT_ALIAS(led0)
-
-#if DT_NODE_HAS_STATUS(LED0_NODE, okay)
-#define LED0	DT_GPIO_LABEL(LED0_NODE, gpios)
-#define PIN	DT_GPIO_PIN(LED0_NODE, gpios)
-#define FLAGS	DT_GPIO_FLAGS(LED0_NODE, gpios)
-#else
-/* A build error here means your board isn't set up to blink an LED. */
-#error "Unsupported board: led0 devicetree alias is not defined"
-#define LED0	""
-#define PIN	0
-#define FLAGS	0
-#endif
-
 
 /* Define an example stats group; approximates seconds since boot. */
 STATS_SECT_START(smp_svr_stats)
@@ -73,15 +57,15 @@ STATS_NAME_END(smp_svr_stats);
 /* Define an instance of the stats group. */
 STATS_SECT_DECL(smp_svr_stats) smp_svr_stats;
 
-#ifdef CONFIG_MCUMGR_CMD_FS_MGMT
-FS_LITTLEFS_DECLARE_DEFAULT_CONFIG(cstorage);
-static struct fs_mount_t littlefs_mnt = {
-	.type = FS_LITTLEFS,
-	.fs_data = &cstorage,
-	.storage_dev = (void *)FLASH_AREA_ID(storage),
-	.mnt_point = "/lfs1"
-};
-#endif
+/* #ifdef CONFIG_MCUMGR_CMD_FS_MGMT */
+/* FS_LITTLEFS_DECLARE_DEFAULT_CONFIG(cstorage); */
+/* static struct fs_mount_t littlefs_mnt = { */
+/* 	.type = FS_LITTLEFS, */
+/* 	.fs_data = &cstorage, */
+/* 	.storage_dev = (void *)FLASH_AREA_ID(storage), */
+/* 	.mnt_point = "/lfs1" */
+/* }; */
+/* #endif */
 
 
 void main(void)
@@ -94,14 +78,14 @@ void main(void)
   }
 
   /* Register the built-in mcumgr command handlers. */
-#ifdef CONFIG_MCUMGR_CMD_FS_MGMT
-  rc = fs_mount(&littlefs_mnt);
-  if (rc < 0) {
-    LOG_ERR("Error mounting littlefs [%d]", rc);
-  }
+/* #ifdef CONFIG_MCUMGR_CMD_FS_MGMT */
+/*   rc = fs_mount(&littlefs_mnt); */
+/*   if (rc < 0) { */
+/*     LOG_ERR("Error mounting littlefs [%d]", rc); */
+/*   } */
   
-  fs_mgmt_register_group();
-#endif
+/*   fs_mgmt_register_group(); */
+/* #endif */
 #ifdef CONFIG_MCUMGR_CMD_OS_MGMT
   os_mgmt_register_group();
 #endif
@@ -133,23 +117,8 @@ void main(void)
   }
 
   ui_evq_init();
-  buttons_init();
-  
-	
-  const struct device *led0;
-  int ret;
-  
-  led0 = device_get_binding(LED0);
-  if (led0 == NULL) {
-    return;
-  }
+  init_buttons();
 
-  ret = gpio_pin_configure(led0, PIN, GPIO_OUTPUT_ACTIVE | FLAGS);
-  if (ret < 0) {
-    return;
-  }
-  gpio_pin_set(led0, PIN, 0);
-  
   const struct device *dev;
 
   dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_display));

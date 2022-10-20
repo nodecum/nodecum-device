@@ -1,7 +1,4 @@
-#include <sys/util.h>
+#include <zephyr/kernel.h>
 
-#define BTN_NR_MASK    GENMASK( 5, 0)
-#define BTN_STATE_BIT  BIT( 6)
-#define BTN_TIME_MASK  GENMASK( 28, 7)    
-#define BTN_EVENT      1
-void buttons_init();
+extern struct k_event* button_events();
+void init_buttons();

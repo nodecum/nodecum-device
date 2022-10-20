@@ -7,18 +7,23 @@
  */
 
 #include "shell_cfb.h"
-#include <init.h>
-#include <logging/log.h>
-#include <logging/log_core.h>
-#include <display/cfb.h>
+#include "shell_parse.h"
+#include "strbuf.h" 
+#include <zephyr/sys/util.h>
+#include <zephyr/init.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/logging/log_core.h>
+#include <zephyr/display/cfb.h>
 
-#include "uievq.h"
 #include "buttons.h"
 
-#define SHELL_PROMPT_CFB "$"
-#define SHELL_CFB_LOG_MESSAGE_QUEUE_SIZE 10
+#define SHELL_CFB_LOG_MESSAGE_QUEUE_SIZE 100
 #define SHELL_CFB_LOG_MESSAGE_QUEUE_TIMEOUT 1000
-SHELL_CFB_DEFINE(shell_transport_cfb);
+//#define CMD_ALT_SIZE 256
+//#define CMD_CHS_SIZE 256
+#define SHELL_PROMPT_CFB "cfb$"
+
+SHELL_CFB_DEFINE(shell_transport_cfb, SHELL_PROMPT_CFB, 128, 128, 128);
 SHELL_DEFINE(shell_cfb, SHELL_PROMPT_CFB, &shell_transport_cfb,
 	     SHELL_CFB_LOG_MESSAGE_QUEUE_SIZE,
 	     SHELL_CFB_LOG_MESSAGE_QUEUE_TIMEOUT,
@@ -29,157 +34,97 @@ struct shell_cfb *sh_cfb;
 
 RING_BUF_DECLARE( rx_ringbuf, 64); // size...64
 
-#define CMD_ALT_SIZE 256
-#define CMD_CHS_SIZE 256
-#define CMD_RES_SIZE 256
-
-// #define WRITE_BUF_LEN 256
-
-static char cmd_alt[CMD_ALT_SIZE];
-static char cmd_chs[CMD_CHS_SIZE];
-//static char write_buf[WRITE_BUF_LEN];
-//static int write_buf_pos = 0;
-static int cmd_alt_pos = 0;
-static int cmd_alt_end = 0;
-static int cmd_chs_pos = 0;
-static int cmd_chs_end = 0;
-
-
-static enum {
-  Character,
-  Escape,
-  EscapeBracket,
-  EscapeNumArg,
-  Newline,
-  Separator
-} parseState = Character;
-
-static enum {
-  Alt, Chs1, Chs2
-} parseContent = Alt;
-
+#define SHELL_WRITE_EVENT BIT(31)
 
 static int init(const struct shell_transport *transport,
 		const void *config,
 		shell_transport_handler_t evt_handler,
 		void *context)
 {
-  sh_cfb = (struct shell_cfb *) transport->ctx;
-    
-  memset(sh_cfb, 0, sizeof(struct shell_cfb));
-  
+  sh_cfb = (struct shell_cfb *) transport->ctx;  
   sh_cfb->shell_handler = evt_handler;
   sh_cfb->shell_context = context;
-  
   ring_buf_reset( &rx_ringbuf);
   return 0;
 }
 
-void resetParsing()
-{
-  //write_buf_pos=0;
-  cmd_alt_pos=0;
-  cmd_alt_end=0;
-  parseState=Character;
-  parseContent=Chs1;
-}
-
-#define SHELL_ALT_EVENT 2
-
-/* static enum { */
-/*   readSelectedCmd */
-/* } readOp; */
-
-static enum {
-  Idle,
-  ChooseArg
-} shellMode=Idle;
-
-//static int choosen_cmd=0;
+#define BTN1P 0x8
+#define BTN2P 0x20
+#define BTN3P 0x80
 
 void shell_cfb_event_loop( const struct device *cfb) {
+  /* LOG_INF( "event_loop: vt=%d,ct=%d,alt='%s',alt.size=%d,cmd='%s',cmd.size=%d", */
+  /* 	   sh_cfb->vt, sh_cfb->ct, */
+  /* 	   sh_cfb->alt->buffer, sh_cfb->alt->size, */
+  /* 	   sh_cfb->cmd->buffer, sh_cfb->cmd->size); */
+  
+  size_t alt_pos = 0;
   while (1) {
-    uint32_t ev = ui_evq_get( K_FOREVER);
-    int evtype = FIELD_GET( EVENT_TYPE_MASK, ev);
-    LOG_INF("evtype=%d,shellMode=%d,altPos=%d,altEnd=%d",evtype,shellMode,cmd_alt_pos,cmd_alt_end);
-    if( evtype == BTN_EVENT) {
-      int btn = FIELD_GET( BTN_NR_MASK, ev);
-      int state = FIELD_GET( BTN_STATE_BIT, ev);
-      if( shellMode == ChooseArg) {
-	if (btn == 1 && state == 1) {
-	  // cycle through alternatives
-	  while( cmd_alt_pos < cmd_alt_end
-		 && cmd_alt[ cmd_alt_pos] != '\0')
-	    ++cmd_alt_pos;
-	  if( cmd_alt_pos < cmd_alt_end) ++cmd_alt_pos; // advance to next entry
-	  if( cmd_alt_pos == cmd_alt_end)
-	    cmd_alt_pos = 0; // wrap around
-
-	  cfb_framebuffer_clear(cfb, false);
-	  cfb_print( cfb, cmd_alt + cmd_alt_pos , 0, 0); 
-	  cfb_framebuffer_finalize( cfb);      
-	} else if( btn == 2 && state == 1) {
-	  // choose current alternative
-	  int i = 0;
-	  cmd_chs_pos = cmd_chs_end;
-	  // skip \0 if not at the beginning
-	  if( cmd_chs_pos > 0) ++cmd_chs_pos;
-	  while( i < cmd_alt_end && cmd_alt[ cmd_alt_pos + i] != '\0') {
-	    cmd_chs[ cmd_chs_pos + i] = cmd_alt[ cmd_alt_pos + i];
-	    ++i;
-	  }
-	  cmd_chs[ cmd_chs_pos + i] = '\0';
-	  cmd_chs_end = cmd_chs_pos + i;
-	      
-	  uint8_t *data;
-	  ring_buf_put_claim( &rx_ringbuf, &data, rx_ringbuf.size);
-	  strcpy( data, cmd_alt + cmd_alt_pos);
-	  strcat( data, " \t");
-	  ring_buf_put_finish( &rx_ringbuf, strlen( data));
-	  resetParsing();
-	  // we already have choosed the root 
-	  sh_cfb->shell_handler( SHELL_TRANSPORT_EVT_RX_RDY,
-				 sh_cfb->shell_context);      
-	} else if( btn == 3 && state == 1) {
-	  // execute command
-	  uint8_t *data;
-	  ring_buf_put_claim( &rx_ringbuf, &data, rx_ringbuf.size);
-	  strcpy( data, "\r");
-	  ring_buf_put_finish( &rx_ringbuf, strlen( data));
-	  resetParsing();
-	  // we would like to receive the result
-	  sh_cfb->shell_handler( SHELL_TRANSPORT_EVT_RX_RDY,
-				 sh_cfb->shell_context);      
-	}
-      } else {
-	// Idle Mode
-	if (btn == 1 && state == 1) {
+    //LOG_INF( "alt_pos:%d,alt_size:%d",alt_pos,sh_cfb->alt->size);
+    bool refresh_display = false; 
+    uint32_t ev_ = k_event_wait( button_events(), 0xffffffff, true, K_FOREVER);
+    // btn1 tab pressed
+    if ( ev_ & BTN1P ) {
+      LOG_INF( "BTN1P tab button");
+      // cycle through alternatives
+      size_t alt_pos_ = alt_pos; // store where we started
+      while( alt_pos < sh_cfb->p->alt->size && sh_cfb->p->alt->buffer[ alt_pos] != ' ')
+	++alt_pos;
+      if( alt_pos < sh_cfb->p->alt->size) {
+	++alt_pos; // advance to next entry
+	refresh_display = true;
+      }
+      else if( alt_pos == sh_cfb->p->alt->size) { // we are on the end
+	if( alt_pos_ == 0) {
+	  // we had only one alternative or no at all
+	  // so we sent the tab key to the shell
 	  uint8_t *data;
 	  ring_buf_put_claim( &rx_ringbuf, &data, rx_ringbuf.size);
 	  strcpy( data, "\t");
 	  ring_buf_put_finish( &rx_ringbuf, strlen( data));
-	  resetParsing();
-	  // we want to choose the root 
 	  sh_cfb->shell_handler( SHELL_TRANSPORT_EVT_RX_RDY,
-				 sh_cfb->shell_context);
-	}
-	else if(btn == 2 && state == 1) {
-	  uint8_t *data;
-	  ring_buf_put_claim( &rx_ringbuf, &data, rx_ringbuf.size);
-	  strcpy( data, "\r");
-	  ring_buf_put_finish( &rx_ringbuf, strlen( data));
-	  resetParsing();
-	  sh_cfb->shell_handler( SHELL_TRANSPORT_EVT_RX_RDY,
-				 sh_cfb->shell_context);      
+				 sh_cfb->shell_context);    
+	} else {
+	  alt_pos = 0; // wrap around
+	  refresh_display = true;
 	}
       }
-    } else if (evtype == SHELL_ALT_EVENT) {
-      if( cmd_alt_end > 0) shellMode=ChooseArg;
-      else shellMode=Idle;
-      //choosen_cmd=0;
-      cmd_alt_pos=0;
+    }
+    if( ev_ & BTN2P ) {
+      LOG_INF( "BTN2P");
+      // choose current alternative
+      uint8_t *data;
+      ring_buf_put_claim( &rx_ringbuf, &data, rx_ringbuf.size);
+      strcpy( data, sh_cfb->p->alt->buffer + alt_pos);
+      strcat( data, " \t");
+      ring_buf_put_finish( &rx_ringbuf, strlen( data));
+      // we already have choosed the root 
+      sh_cfb->shell_handler( SHELL_TRANSPORT_EVT_RX_RDY,
+			     sh_cfb->shell_context);    
+    }
+    if( ev_ & BTN3P ) {
+      LOG_INF( "BTN3P");
+      // execute command
+      uint8_t *data;
+      ring_buf_put_claim( &rx_ringbuf, &data, rx_ringbuf.size);
+      strcpy( data, "\r");
+      ring_buf_put_finish( &rx_ringbuf, strlen( data));
+      // we would like to receive the result
+      sh_cfb->shell_handler( SHELL_TRANSPORT_EVT_RX_RDY,
+			     sh_cfb->shell_context);      
+    }
+    if ( (ev_ & SHELL_WRITE_EVENT) || refresh_display ) {
+      LOG_INF( "Display" );
+      char buf[128];
+      size_t i = 0, j = 0;
+      while( j < sh_cfb->p->cmd->size && i < 128) 
+	buf[i++] = sh_cfb->p->cmd->buffer[ j++];
+      j = alt_pos;
+      while( j < sh_cfb->p->alt->size && i < 128) 
+	buf[i++] = sh_cfb->p->alt->buffer[ j++];
+      if( i < 128) buf[i]='\0'; else buf[127]='\0';
       cfb_framebuffer_clear(cfb, false);
-      cfb_print( cfb, cmd_alt + cmd_alt_pos , 0, 0); 
+      cfb_print( cfb, buf, 0, 0); 
       cfb_framebuffer_finalize( cfb);      
     }
   }
@@ -210,112 +155,15 @@ static int write(const struct shell_transport *transport,
     return -ENODEV;
   }
   const char* data_ = (const char *) data;
-  /* int i = 0; */
-  /* for(; i < length && write_buf_pos < WRITE_BUF_LEN; i++, write_buf_pos++) { */
-  /*   write_buf[write_buf_pos] = data_[i]; */
-  /* } */
-  /* LOG_HEXDUMP_INF( (const char *) write_buf, write_buf_pos,"data:"); */
-  /* *cnt = i; */
-  bool signal_event=false;
-  int j = 0;
-  for(; j < length; ++j) {
-    char c = data_[j];
-    if( c == 0x1b) { parseState = Escape; continue; }
-    if( parseState == Escape && c == '[') {
-      parseState = EscapeBracket; continue;
-    }
-    if( parseState == EscapeBracket ) {
-      parseState = Character;
-      if( c == 'm' ) continue; // MODESOFF 
-      if( c >= '0' && c <= '9') {
-	parseState = EscapeNumArg; continue;
-      }
-      continue;
-    }
-    if( parseState == EscapeNumArg ) {
-      if( c >= '0' && c <= '9')	continue;
-      parseState = Character;
-      if( c == 'C' || c == 'D' ) { // DIRECTION
-	parseState = Separator; continue;
-      }
-      continue;
-    }
-    if( c == '\r' || c == '\n' ) {
-      parseState = Newline;
-      if( parseContent == Chs1) {
-	parseState = Character;
-	parseContent = Alt;
-      } 
-      continue;
-    }
-    if( c == ' ') {
-      parseState = Separator;
-      continue;
-    }
-    if( parseContent == Alt) {
-      if( parseState == Separator || parseState == Newline ) {
-	if( cmd_alt_pos > 0 ) {
-	  cmd_alt[ cmd_alt_pos] = '\0';
-	  if( cmd_alt_pos < CMD_ALT_SIZE-1) {
-	    ++cmd_alt_pos;
-	    cmd_alt_end=cmd_alt_pos;
-	  }
-	}
-      }
-      if( parseState == Newline && c == SHELL_PROMPT_CFB[0]) {
-	cmd_alt_end = cmd_alt_pos;
-	parseState = Character;
-	parseContent = Chs2;
-	cmd_chs_pos = 0;
-	if( cmd_chs_pos == cmd_chs_end) {
-	  // there are no args yet
-	  signal_event=true;
-	}
-	continue;
-      }
-      parseState = Character;
-      cmd_alt[ cmd_alt_pos] = c;
-      if( cmd_alt_pos < CMD_ALT_SIZE-1) {
-	++cmd_alt_pos;
-	cmd_alt_end=cmd_alt_pos;
-      }
-    } else if ( parseContent == Chs2 ) {
-      if( parseState == Separator) {
-	if( cmd_chs_pos == cmd_chs_end) signal_event=true;
-	else {
-	    
-	}
-      }
-      ++cmd_chs_pos;
-    } 
-  }
-  *cnt = j;
-  char buf[256];
-  int i = 0;
-  j = 0;
-  for( ;i < cmd_alt_end; ++i, ++j) {
-    if( cmd_alt[ i] == '\0') {
-      buf[j++]='\r'; buf[j]='\n';
-    }
-    else buf[j] = cmd_alt[i];
-  }
-  buf[j]='\0';
-  LOG_INF( "content=%d,state=%d,chspos=%d,chsend=%d,sinal=%d,cnt=%d, cmd_alt=\r\n%s",
-	   parseContent,parseState,cmd_chs_pos,cmd_chs_end,signal_event, *cnt, buf);
-  i = 0, j = 0;
-  for( ;i < cmd_chs_end; ++i, ++j) {
-    if( cmd_chs[ i] == '\0') {
-      buf[j++]='\r'; buf[j]='\n';
-    }
-    else buf[j] = cmd_chs[i];
-  }
-  buf[j]='\0';
-  LOG_INF( "cmd_chs=\r\n%s", buf);
+  //LOG_HEXDUMP_INF( data_, length,"write data:");
+  *cnt = shell_parse(  data_, length, sh_cfb->p);
+  /* LOG_INF( "ct=%d,cmd='%s',alt='%s',out='%s'", */
+  /* 	   sh_cfb->p->ct, */
+  /* 	   sh_cfb->p->cmd->buffer, */
+  /* 	   sh_cfb->p->alt->buffer, */
+  /* 	   sh_cfb->p->out->buffer); */
   
-  if( signal_event) {
-    ui_evq_put( FIELD_PREP( EVENT_TYPE_MASK, SHELL_ALT_EVENT));
-  }
-
+  k_event_post( button_events(), SHELL_WRITE_EVENT);  
   sh_cfb->shell_handler( SHELL_TRANSPORT_EVT_TX_RDY,
 			 sh_cfb->shell_context);
   return 0;
