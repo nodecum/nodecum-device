@@ -5,17 +5,20 @@
 #include "strbuf.h"
 
 enum vt_state {
-  Character,
+  Unspec,
   Escape,
   EscapeBracket,
   EscapeNumArg,
+  EscapeUnknown,
+  Return,
   Newline,
-  Separator
+  Separator,
 };
 
 enum ct_state {
   Prompt,
   Cmd,
+  AltOrOut,
   Alt,
   Out
 };
@@ -40,9 +43,7 @@ struct shell_parse_t {
   static struct shell_parse_t _name##_shell_parse = {			\
     .prompt = _prompt,							\
     .prompt_i = 0,							\
-    .vt  = Newline,							\
-    .vt_ = Character,							\
-    .vt__ = Character,							\
+    .vt  = Unspec,							\
     .ct  = Out,								\
     .cmd = &_name##_cmd_buf,						\
     .alt = &_name##_alt_buf,						\
