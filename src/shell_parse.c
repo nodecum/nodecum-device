@@ -50,8 +50,8 @@ extern size_t shell_parse( const char* data, size_t length,
       if( p->ct == Cmd || p->ct == AltOrOut) {
         p->ct = AltOrOut;  continue; 
       }
-      else if( p->ct == Alt ) { separator = true; }
-      else { } // Out mode, just use c as '\n' 
+      //else if( p->ct == Alt ) { separator = true; }
+      //else { } // Out mode, just use c as '\n' 
     }
     // following separators do not accumulate
     if( p->vt == Separator && separator) continue;  
@@ -61,20 +61,26 @@ extern size_t shell_parse( const char* data, size_t length,
       // entire prompt has matched
       if( c_ == '\0' ) {
         p->prompt_i = 0;
-        if( c == ' ') {
-	        // change to Cmd context 
-	        p->cmd->size=0; p->ct = Cmd; 
-        } else if( c == '\r') {
+        if( c == '\r') {
           // return after Prompt
           p->ct = AltOrOut; 
           p->vt = Return;
+          continue;
         } else {
-          // unusual behaviour
-          p->ct = Out;  
+          // change to Cmd context 
+	        p->cmd->size=0; p->ct = Cmd; 
+          // reset alternatives
+          //p->alt->size=0;
         }
-        continue;     
       } else if( c_ == c) {
 	      // charater matched, advance to next
+        //
+        // here is the point that we have to check if we
+        // finished an alternative, if so then remove trailing
+        // space if there is one
+        // ( propably there is always one )
+        if( p->ct == Alt && p->alt->size > 0 && p->alt->buffer[ p->alt->size-1] == ' ')
+          --(p->alt->size);
 	      p->ct = Prompt; ++(p->prompt_i);
 	      p->vt = Unspec;
 	      continue;
@@ -89,7 +95,6 @@ extern size_t shell_parse( const char* data, size_t length,
       	  size_t i = 0;
 	        while( i < p->prompt_i) {
 	          p->out->buffer[ p->out->size] = p->prompt[ i++];
-	          STR_BUF_INC( p->out);
 	        }
           p->ct = Out;
         }
@@ -99,7 +104,10 @@ extern size_t shell_parse( const char* data, size_t length,
     if( p->ct == AltOrOut ) {
       if( separator) {
 	      // we change to alternatives mode
-	      p->alt->size = 0; p->ct = Alt; 
+	      p->alt->size = 0; p->ct = Alt;
+        p->alt_pos = 0; 
+        // clear output 
+        p->out->size = 0;
       } else {
 	      // new line was not followed by separtor, this means output
 	      p->out->size = 0; p->ct = Out;
@@ -111,9 +119,10 @@ extern size_t shell_parse( const char* data, size_t length,
     } else if( p->ct == Out) {
       p->out->buffer[ p->out->size] = c; STR_BUF_INC( p->out);
     } else if( p->ct == Alt) {
-      if( separator ) {
-        if( p->alt->size > 0 ) {
-          p->alt->buffer[ p->alt->size] = ' '; STR_BUF_INC( p->alt);
+      if( separator || p->vt == Newline) {
+        if( p->alt->size > 0 && p->alt->buffer[ p->alt->size - 1] != ' ') {
+          // spaces should not accumulate, no space at the beginning
+          p->alt->buffer[ p->alt->size] = ' '; STR_BUF_INC( p->alt);    
         }
       } else {
         p->alt->buffer[ p->alt->size] = c; STR_BUF_INC( p->alt);

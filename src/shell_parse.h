@@ -27,27 +27,27 @@ struct shell_parse_t {
   const char *prompt;  // shell prompt, this signals an command line
   size_t prompt_i;     // actual index of prompt for comparing
   enum vt_state vt;    // virtual terminal state
-  enum vt_state vt_;   // the proceeding vt state
-  enum vt_state vt__;  // prepreceeding
   enum ct_state ct;    // actual context
   struct str_buf *cmd; // command line
   struct str_buf *alt; // alternatives
   struct str_buf *out; // command result output
+  size_t alt_pos;      // the actual choosen alternative, position in alt->buffer
 };
 
 #define SHELL_PARSE_DEFINE(_name, _prompt, _cmd_buf_size,		\
-			   _alt_buf_size, _out_buf_size)		\
+			   _alt_buf_size, _out_buf_size)		              \
   STR_BUF_DECLARE(_name##_cmd_buf, _cmd_buf_size);			\
   STR_BUF_DECLARE(_name##_alt_buf, _alt_buf_size);			\
   STR_BUF_DECLARE(_name##_out_buf, _out_buf_size);			\
-  static struct shell_parse_t _name##_shell_parse = {			\
-    .prompt = _prompt,							\
-    .prompt_i = 0,							\
-    .vt  = Unspec,							\
-    .ct  = Out,								\
-    .cmd = &_name##_cmd_buf,						\
-    .alt = &_name##_alt_buf,						\
-    .out = &_name##_out_buf						\
+static struct shell_parse_t _name##_shell_parse = {		 	\
+    .prompt = _prompt,							                    \
+    .prompt_i = 0,							                        \
+    .vt  = Unspec,						  	                      \
+    .ct  = Out,							  	                        \
+    .cmd = &_name##_cmd_buf,						                \
+    .alt = &_name##_alt_buf,						                \
+    .out = &_name##_out_buf,						                \
+    .alt_pos = 0                                        \
   };                                                                    
 
 extern size_t shell_parse( const char* data, size_t length, 
