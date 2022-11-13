@@ -50,6 +50,38 @@ static int init(const struct shell_transport *transport,
   return 0;
 }
 
+// copy current alternative to data with ommitting
+// the letters in the last snippet of cmdline if present 
+// begin to write at position *i in data 
+// *i gets incremented as data will be writen
+void copy_alt( struct shell_parse_t *p, uint8_t *data, size_t* i, uint32_t max_len) 
+{   
+  size_t j = p->alt_pos;
+  // if cmd exists then copy only if last char is space 
+  bool match = false;  
+  if( p->cmd->size > 0 && p->alt_eq_part > 0 && p->alt_eq_part < p->alt->size ) {
+    int i_ = p->alt_eq_part - 1;
+    int j_ = p->cmd->size - 1;
+    match = true;
+    while( match && j_ >= 0 && p->cmd->buffer[ j_] != ' ') {
+      match = i_ >= 0 && p->cmd->buffer[ j_] == p->alt->buffer[ i_];
+      --i_; --j_;
+    } 
+    match = match && i_ < 0;
+    if(match) {
+      printk("MATCH i_=%d, j_=%d, match=%d\n", i_, j_, match);
+      j += p->alt_eq_part;
+    }
+  }
+  if( p->cmd->size == 0 || p->cmd->buffer[ p->cmd->size - 1] == ' ' || match) {
+    while( j < p->alt->size && *i < max_len && 
+           p->alt->buffer[ j] != ' ' ) {
+      data[*i] = p->alt->buffer[j];
+      (*i)++; j++;
+    }
+  }
+}
+
 #define BTN1P '1'
 #define BTN2P '2'
 #define BTN3P '3'
@@ -100,14 +132,11 @@ void shell_console_input_loop() {
       uint8_t *data;
       uint32_t max_len = ring_buf_put_claim( &rx_ringbuf, &data, rx_ringbuf.size);
       size_t i = 0;
-      
-      size_t j = p->alt_pos;
-      while( j < p->alt->size && i < max_len && 
-              p->alt->buffer[ j] != ' ' )  
-       	data[i++] = p->alt->buffer[ j++]; 
+      copy_alt( p, data, &i, max_len);
       if( i < max_len) data[i++] = ' ';
       if( i < max_len) data[i++] = '\t';
       ring_buf_put_finish( &rx_ringbuf, i);
+      p->alt->size = 0;
       // we already have choosed the root 
       sc->shell_handler( SHELL_TRANSPORT_EVT_RX_RDY,
 			     sc->shell_context);    
@@ -116,9 +145,11 @@ void shell_console_input_loop() {
       printk( "BTN3P\n");
       // execute command
       uint8_t *data;
-      ring_buf_put_claim( &rx_ringbuf, &data, rx_ringbuf.size);
-      strcpy( data, "\r");
-      ring_buf_put_finish( &rx_ringbuf, strlen( data));
+      uint32_t max_len = ring_buf_put_claim( &rx_ringbuf, &data, rx_ringbuf.size);
+      size_t i = 0;
+      copy_alt( p, data, &i, max_len);
+      if( i < max_len) data[i++] = '\r';
+      ring_buf_put_finish( &rx_ringbuf, i);
       // we would like to receive the result
       sc->shell_handler( SHELL_TRANSPORT_EVT_RX_RDY,
 			     sc->shell_context);      
@@ -145,16 +176,25 @@ void shell_console_output_loop( void*, void*, void*) {
     if ( ev_ & SHELL_WRITE_EVENT )  {
       // printk( "SHELL_WRITE_EVENT\n" );
       char buf[128];
-      size_t i = 0, j = 0;
-      while( j < p->cmd->size && i < 128)  
-        buf[i++] = p->cmd->buffer[ j++]; 
-      j = p->alt_pos;
-      while( j < p->alt->size && i < 128 && 
-              p->alt->buffer[ j] != ' ' )  
-       	buf[i++] = p->alt->buffer[ j++]; 
+      size_t i = 0;
+      while( i < p->cmd->size && i < 128) {  
+        buf[i] = p->cmd->buffer[ i];
+        ++i; 
+      }
+      copy_alt( p, buf, &i, 128);  
       if( i < 128) buf[i]='\0'; else buf[127]='\0'; 
-      
-      printk( "c:'%s' a:'%s' o:'%s'\n", p->cmd->buffer, p->alt->buffer, p->out->buffer  ); 
+      printk( "ct:");
+      switch (p->ct)
+      {
+      case Prompt: printk("Prompt"); break;
+      case PromptMatched: printk("PromptMatched"); break;
+      case Cmd: printk("Cmd"); break;
+      case AltOrOut: printk("AltOrOut"); break;
+      case Alt: printk("Alt"); break;
+      case Out: printk("Out"); break;
+      }
+      printk( " eq:%d", p->alt_eq_part);
+      printk( " cmd:'%s' alt:'%s' out:'%s'\n", p->cmd->buffer, p->alt->buffer, p->out->buffer  ); 
       printk( "buf:'%s'\n", buf );
     }
     else if ( ev_ & TERMINATE_OUTPUT_LOOP) {

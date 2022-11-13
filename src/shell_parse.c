@@ -29,8 +29,14 @@ extern size_t shell_parse( const char* data, size_t length,
     if( p->vt == EscapeBracket ) {
       p->vt = Unspec;
       if( c == 'm' ) continue; // MODESOFF 
-      if( c >= '0' && c <= '9') { p->vt = EscapeNumArg; continue; }
-      continue;
+      else if( c >= '0' && c <= '9') { p->vt = EscapeNumArg; continue; }
+      else if( c == 'H' ) { 
+        // clear screen, we just declare it as newline 
+        //p->vt = Newline;
+        //p->ct = AltOrOut; 
+        // continue;
+        c = ' ';
+      } else continue;
     }
     if( p->vt == EscapeNumArg ) {
       if( c >= '0' && c <= '9')	continue;
@@ -55,24 +61,23 @@ extern size_t shell_parse( const char* data, size_t length,
     }
     // following separators do not accumulate
     if( p->vt == Separator && separator) continue;  
+    if( p->ct == PromptMatched) {
+      if( c == '\r') {
+        // return after Prompt
+        p->ct = AltOrOut; 
+        p->vt = Return;
+        continue;
+      } else {
+        // change to Cmd context 
+	      p->ct = Cmd; 
+        // reset alternatives
+        // p->alt->size=0; p->alt_pos=0;
+      }
+    }
     // test for prompt
     if( (p->vt == Newline && p->prompt_i == 0) || p->ct == Prompt ) {      
       const char c_ = p->prompt[ p->prompt_i];
-      // entire prompt has matched
-      if( c_ == '\0' ) {
-        p->prompt_i = 0;
-        if( c == '\r') {
-          // return after Prompt
-          p->ct = AltOrOut; 
-          p->vt = Return;
-          continue;
-        } else {
-          // change to Cmd context 
-	        p->cmd->size=0; p->ct = Cmd; 
-          // reset alternatives
-          //p->alt->size=0;
-        }
-      } else if( c_ == c) {
+      if( c_ == c) {
 	      // charater matched, advance to next
         //
         // here is the point that we have to check if we
@@ -81,9 +86,25 @@ extern size_t shell_parse( const char* data, size_t length,
         // ( propably there is always one )
         if( p->ct == Alt && p->alt->size > 0 && p->alt->buffer[ p->alt->size-1] == ' ')
           --(p->alt->size);
-	      p->ct = Prompt; ++(p->prompt_i);
-	      p->vt = Unspec;
-	      continue;
+        // we check if we matched the last prompt char
+        if( p->prompt[p->prompt_i+1] == '\0') {
+          p->prompt_i = 0;
+          p->cmd->size = 0;
+          if( p->alt_or_out_before_prompt) {
+            // in case we had no output 
+            // and no alternatives
+            SHELL_PARSE_RESET_ALT( p);
+          }
+          p->ct = PromptMatched;
+        } else {
+          if( p->ct != Prompt) {
+            p->alt_or_out_before_prompt = ( p->ct == AltOrOut);
+            p->ct = Prompt;
+          }
+          ++(p->prompt_i);
+        }
+        p->vt = Unspec;
+        continue;
       } else {
 	      // character mismatch, 
         if( p->ct == AltOrOut || p->ct == Alt) {
@@ -97,6 +118,9 @@ extern size_t shell_parse( const char* data, size_t length,
 	          p->out->buffer[ p->out->size] = p->prompt[ i++];
 	        }
           p->ct = Out;
+          // reset alternatives and command line 
+          SHELL_PARSE_RESET_ALT( p);
+          p->cmd->size = 0;
         }
         p->prompt_i = 0;
       }
@@ -104,8 +128,8 @@ extern size_t shell_parse( const char* data, size_t length,
     if( p->ct == AltOrOut ) {
       if( separator) {
 	      // we change to alternatives mode
-	      p->alt->size = 0; p->ct = Alt;
-        p->alt_pos = 0; 
+	      SHELL_PARSE_RESET_ALT( p);
+        p->ct = Alt;
         // clear output 
         p->out->size = 0;
       } else {
@@ -125,11 +149,26 @@ extern size_t shell_parse( const char* data, size_t length,
           p->alt->buffer[ p->alt->size] = ' '; STR_BUF_INC( p->alt);    
         }
       } else {
-        p->alt->buffer[ p->alt->size] = c; STR_BUF_INC( p->alt);
+        p->alt->buffer[ p->alt->size] = c; 
+        if( p->alt->size == p->alt_eq_part) {
+          // we are filling the first alternative
+          ++(p->alt_eq_part);
+        } else if( p->alt_eq_part > 0) {
+          // we get the char position in the current alternative
+          // by looking back to the space separator
+          int i = p->alt->size - 1;
+          while ( i > 0 && p->alt->buffer[ i] != ' ' ) --i;
+          // now i points to the space char
+          int rel_pos = p->alt->size - i - 1; // relative char pos in current alternativ
+          // test if char matches
+          if( p->alt_eq_part > rel_pos && p->alt->buffer[rel_pos] != c) 
+            p->alt_eq_part = rel_pos;
+        }
+        STR_BUF_INC( p->alt);
       }
     }
     if( separator ) p->vt = Separator; 
-    else if ( c != '\n' && p->vt != Newline) {
+    else if ( ! (c == '\n' && p->vt == Newline)) {
       // we can overwrite this 
       // if we have not a fresh newline
       p->vt = Unspec; 
