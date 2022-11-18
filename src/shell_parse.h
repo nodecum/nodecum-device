@@ -36,6 +36,7 @@ struct shell_parse_t {
   struct str_buf *out; // command result output
   size_t alt_eq_part;  // length of equal leading characters in alternatives
   size_t alt_pos;      // the actual choosen alternative, position in alt->buffer
+  struct k_mutex *mutex;
 };
 
 #define SHELL_PARSE_DEFINE(_name, _prompt, _cmd_buf_size,	\
@@ -43,6 +44,7 @@ struct shell_parse_t {
   STR_BUF_DECLARE(_name##_cmd_buf, _cmd_buf_size);			  \
   STR_BUF_DECLARE(_name##_alt_buf, _alt_buf_size);			  \
   STR_BUF_DECLARE(_name##_out_buf, _out_buf_size);        \
+  K_MUTEX_DEFINE( _name##_mutex);                         \
 static struct shell_parse_t _name##_shell_parse = {		 	\
     .prompt = _prompt,							                    \
     .prompt_i = 0,							                        \
@@ -53,7 +55,8 @@ static struct shell_parse_t _name##_shell_parse = {		 	\
     .alt = &_name##_alt_buf,						                \
     .out = &_name##_out_buf,						                \
     .alt_eq_part = 0,                                   \
-    .alt_pos = 0                                        \
+    .alt_pos = 0,                                       \
+    .mutex = &_name##_mutex                             \
   };                                                                    
 
 #define SHELL_PARSE_RESET_ALT( _p)  \

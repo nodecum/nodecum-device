@@ -16,17 +16,23 @@ extern "C" {
     /** Context registered by shell. */
     void *shell_context;
     struct shell_parse_t *p;
+    struct str_buf *cmd_buf;
+    struct str_buf *out_buf;
   };
 
 #define SHELL_CONSOLE_DEFINE(_name, _prompt, _cmd_buf_size,		\
-			     _alt_buf_size, _out_buf_size)		\
-  SHELL_PARSE_DEFINE( _name##_p, _prompt, _cmd_buf_size,		\
-		      _alt_buf_size, _out_buf_size);			\
-  static struct shell_console _name##_shell_console = {			\
-    .p = &_name##_p_shell_parse						\
-  };                                                                    \
-  struct shell_transport _name = {					\
-    .api = &shell_console_transport_api,				\
+	                  		     _alt_buf_size, _out_buf_size)		\
+  SHELL_PARSE_DEFINE( _name##_p, _prompt, _cmd_buf_size,		  \
+		                  _alt_buf_size, _out_buf_size);			    \
+  STR_BUF_DECLARE( _name##_cmd_buf, _cmd_buf_size);           \
+  STR_BUF_DECLARE( _name##_out_buf, _out_buf_size);           \
+  static struct shell_console _name##_shell_console = {			  \
+    .p = &_name##_p_shell_parse,					                    \
+    .cmd_buf = &_name##_cmd_buf,                              \
+    .out_buf = &_name##_out_buf                               \
+  };                                                          \
+  struct shell_transport _name = {					                  \
+    .api = &shell_console_transport_api,				              \
     .ctx = (struct shell_console *)&_name##_shell_console,		\
   };
   int enable_shell_console( const struct device *arg);
