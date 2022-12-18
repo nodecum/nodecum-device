@@ -1,0 +1,14 @@
+menu "SHELL_BROWSER"
+
+config SHELL_BROWSER_STACK_SIZE
+       int "Shell Browser stack size"
+       default 1024
+       help
+         Stack size for thread
+
+config SHELL_BROWSER_THREAD_PRIORITY
+       int "Shell Browser thread priority"
+       default 5
+       help
+         Set thread priority of the shell browser
+endmenu

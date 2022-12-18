@@ -27,14 +27,15 @@ struct sect_str_buf {
 };
 
 #define SECT_STR_BUF_DECLARE(name, size_)			\
-  static char __noinit _sect_str_buf_data_##name[size_];	\
-  struct str_buf name = {					\
-    .buffer = _str_buf_data_##name,				\
+  static char __noinit _sect_str_buf_data_##name[size_ + 1];	\
+  struct sect_str_buf name = {					\
+    .buffer = _sect_str_buf_data_##name,				\
     .begin = 0,							\
     .end = 0,							\
     .max_size = size_						\
   }
 
+#define SECT_STR_BUF_TERM_ZERO( b)  b->buffer[b->end] = '\0'	
 
 
 

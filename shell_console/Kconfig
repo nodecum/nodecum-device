@@ -1,0 +1,9 @@
+# rsource "osrc/Kconfig"
+
+menu "Zephyr"
+source "Kconfig.zephyr"
+endmenu
+
+menu "SHELL_BROWSER_CONSOLE"
+rsource "../src/Kconfig"
+endmenu

@@ -5,6 +5,8 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(shell_console)
 
 target_sources(app PRIVATE ../src/shell_parse.c)
+target_sources(app PRIVATE ../src/shell_browser.c)
+target_sources(app PRIVATE ../src/shell_browser_console.c)
 target_sources(app PRIVATE src/shell_console.c)
 target_sources(app PRIVATE src/main.c)
 

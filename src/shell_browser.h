@@ -62,7 +62,6 @@ extern "C" {
   
   struct shell_browser_ctx {
     const char* prompt;
-
     enum shell_browser_state state;
     struct shell_parse_t *p;
     struct str_buf *cmd_buf;
@@ -72,13 +71,13 @@ extern "C" {
     struct k_mutex wr_mtx;
     k_tid_t tid;
   };
-  
+   
   /**
    * @brief Shell Browser instance.
    */
   struct shell_browser {
     const char *default_prompt; 
-    struct shell_browser_transport *iface;
+    const struct shell_browser_transport *iface;
     struct shell_browser_ctx *ctx;
     const char *thread_name;
     struct k_thread *thread;
@@ -88,27 +87,29 @@ extern "C" {
 #define SHELL_BROWSER_DEFINE( _name, _iface, _prompt, _cmd_buf_size,    \
                               _alt_buf_size, _out_buf_size )            \
   static const struct shell_browser _name;                              \
-  static struct shell_ctx UTIL_CAT(_name, _ctx);                        \
   SHELL_PARSE_DEFINE( _name##_p, _prompt, _cmd_buf_size,                \
                       _alt_buf_size, _out_buf_size);                    \
   STR_BUF_DECLARE( _name##_cmd_buf, _cmd_buf_size);                     \
   STR_BUF_DECLARE( _name##_out_buf, _out_buf_size);                     \
-  static K_KERNEL_STACK_DEFINE(_name##_stack, CONFIG_SHELL_BROWSER_STACK_SIZE); \
-	static struct k_thread _name##_thread;                                \
-  static const STRUCT_SECTION_ITERABLE(shell_browser, _name) = {        \
-    .default_prompt = &_prompt,                                         \
-    .iface = &_iface,                                                   \
-    .ctx = &UTIL_CAT( _name, _ctx),                                     \
+  static struct shell_browser_ctx _name##_ctx = {                       \
     .p = &_name##_p_shell_parse,                                        \
     .cmd_buf = &_name##_cmd_buf,                                        \
     .out_buf = &_name##_out_buf                                         \
+  };                                                                    \
+  static K_KERNEL_STACK_DEFINE(_name##_stack, CONFIG_SHELL_BROWSER_STACK_SIZE); \
+  /*static K_THREAD_STACK_DEFINE(_name##_stack, stack_size);*/          \
+	static struct k_thread _name##_thread;                                \
+  static const struct shell_browser _name  = {                          \
+    .default_prompt = _prompt,                                          \
+    .iface = _iface,                                                    \
+    .ctx = &_name##_ctx,                                                \
     .thread_name = STRINGIFY(_name),                                    \
 		.thread = &_name##_thread,                                          \
 		.stack = _name##_stack                                              \
   };                                                                    \
   
-  int shell_browser_init(const struct shell_browser *shell_browser,
-                         const void *config);
+  int shell_browser_init( const struct shell_browser *shell_browser,
+                          const void *config);
   
 #ifdef __cplusplus
 }
