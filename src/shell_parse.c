@@ -20,7 +20,6 @@ LOG_MODULE_REGISTER(shell_parse, LOG_LEVEL_DBG);
 extern size_t shell_parse( const char* data, size_t length, 
 			   struct shell_parse_t *p)
 {
-  k_mutex_lock( p->mutex, K_FOREVER);
   int j = 0;
   for(; j < length; ++j) {
     // check the current character
@@ -179,7 +178,6 @@ extern size_t shell_parse( const char* data, size_t length,
   p->cmd->buffer[ p->cmd->size] = '\0';
   p->alt->buffer[ p->alt->size] = '\0';
   p->out->buffer[ p->out->size] = '\0';
-  k_mutex_unlock( p->mutex);
   return j;
 } 
 

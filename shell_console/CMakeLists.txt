@@ -7,7 +7,7 @@ project(shell_console)
 target_sources(app PRIVATE ../src/shell_parse.c)
 target_sources(app PRIVATE ../src/shell_browser.c)
 target_sources(app PRIVATE ../src/shell_browser_console.c)
-target_sources(app PRIVATE src/shell_console.c)
+# target_sources(app PRIVATE src/shell_console.c)
 target_sources(app PRIVATE src/main.c)
 
 zephyr_include_directories(../src)

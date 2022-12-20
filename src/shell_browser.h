@@ -57,6 +57,8 @@ extern "C" {
     SHELL_BROWSER_SIGNAL_SHELL_RX_RDY,
     SHELL_BROWSER_SIGNAL_CONSOLE_TX_DONE,
     SHELL_BROWSER_SIGNAL_SHELL_TX_DONE,
+    SHELL_BROWSER_SIGNAL_SHELL_PARSED,
+    SHELL_BROWSER_SIGNAL_ALT_POS_CHANGED,
     SHELL_BROWSER_SIGNALS
   };
   
@@ -66,6 +68,9 @@ extern "C" {
     struct shell_parse_t *p;
     struct str_buf *cmd_buf;
     struct str_buf *out_buf;
+    bool refresh_display;
+    enum ct_state ct;
+    enum ct_state ct_;
     struct k_poll_signal signals[SHELL_BROWSER_SIGNALS];
     struct k_poll_event events[SHELL_BROWSER_SIGNALS];
     struct k_mutex wr_mtx;
@@ -94,7 +99,10 @@ extern "C" {
   static struct shell_browser_ctx _name##_ctx = {                       \
     .p = &_name##_p_shell_parse,                                        \
     .cmd_buf = &_name##_cmd_buf,                                        \
-    .out_buf = &_name##_out_buf                                         \
+    .out_buf = &_name##_out_buf,                                        \
+    .refresh_display = true,                                            \
+    .ct = Prompt,                                                       \
+    .ct_ = Prompt                                                       \
   };                                                                    \
   static K_KERNEL_STACK_DEFINE(_name##_stack, CONFIG_SHELL_BROWSER_STACK_SIZE); \
   /*static K_THREAD_STACK_DEFINE(_name##_stack, stack_size);*/          \

@@ -11,4 +11,9 @@ config SHELL_BROWSER_THREAD_PRIORITY
        default 5
        help
          Set thread priority of the shell browser
+
+config SHELL_BROWSER_MAX_LEN_CMD_PART
+       int "Maximal Length of command part"
+       default 25
+
 endmenu
