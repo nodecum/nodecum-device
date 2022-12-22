@@ -47,9 +47,6 @@ extern "C" {
     void *ctx;
   };
 
-  //typedef void (*shell_browser_console_handler_t)
-  //(enum shell_browser_console_evt evt, void *context);
-
   // order depends on shell_browser_evt
   enum shell_browser_signal {
     SHELL_BROWSER_SIGNAL_KILL,
@@ -61,6 +58,11 @@ extern "C" {
     SHELL_BROWSER_SIGNAL_ALT_POS_CHANGED,
     SHELL_BROWSER_SIGNALS
   };
+
+  enum shell_browser_mode {
+    SB_MODE_PARSE,
+    SB_MODE_PRINT
+  };
   
   struct shell_browser_ctx {
     const char* prompt;
@@ -71,6 +73,7 @@ extern "C" {
     bool refresh_display;
     enum ct_state ct;
     enum ct_state ct_;
+    enum shell_browser_mode mode;
     struct k_poll_signal signals[SHELL_BROWSER_SIGNALS];
     struct k_poll_event events[SHELL_BROWSER_SIGNALS];
     struct k_mutex wr_mtx;
@@ -102,7 +105,8 @@ extern "C" {
     .out_buf = &_name##_out_buf,                                        \
     .refresh_display = true,                                            \
     .ct = Prompt,                                                       \
-    .ct_ = Prompt                                                       \
+    .ct_ = Prompt,                                                      \
+    .mode = SB_MODE_PARSE                                               \
   };                                                                    \
   static K_KERNEL_STACK_DEFINE(_name##_stack, CONFIG_SHELL_BROWSER_STACK_SIZE); \
   /*static K_THREAD_STACK_DEFINE(_name##_stack, stack_size);*/          \

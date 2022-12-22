@@ -157,7 +157,7 @@ void sb_choose_current_alternative( const struct shell_browser* sb)
   size_t i = 0; 
   uint32_t nd = max_len; // dummy, not used here
   copy_alt( sb->ctx->p, data, &i, max_len, &nd);
-  if( i < max_len) data[i++] = ' ';
+  if( i > 0 && i < max_len) data[i++] = ' ';
   if( i < max_len) data[i++] = '\t';
   write_to( sb, SHELL_EP, data, i);
   sb->ctx->p->alt->size = 0;
@@ -194,12 +194,16 @@ void shell_browser_handle_console( const struct shell_browser* sb)
     sb_choose_current_alternative( sb); break;
   case '3':
     sb_execute_command( sb); break;
+  case '4':
+    sb->ctx->mode = SB_MODE_PARSE; break;
+  case '5':
+    sb->ctx->mode = SB_MODE_PRINT; break;
+  default:
+    write_to( sb, SHELL_EP, &data, sizeof( data));
   }
   if ( refresh_display) {
     sent_event( sb, SHELL_BROWSER_SIGNAL_ALT_POS_CHANGED);
   }
-  //(void) sb->iface->api->write_to_shell
-  //  ( sb->iface, &data, sizeof( data), &count);
 }
 
 void shell_browser_handle_shell( const struct shell_browser* sb)
@@ -211,11 +215,15 @@ void shell_browser_handle_shell( const struct shell_browser* sb)
   if( count == 0) {
     return;
   }
-  shell_parse( &data, sizeof( data), sb->ctx->p);
-  sent_event( sb, SHELL_BROWSER_SIGNAL_SHELL_PARSED);
-  //printk("shell:%c\n",data);
-  //(void) sb->iface->api->write_to_console
-  //  ( sb->iface, &data, sizeof( data), &count);
+  switch( sb->ctx->mode) {
+  case SB_MODE_PARSE:
+    shell_parse( &data, sizeof( data), sb->ctx->p);
+    sent_event( sb, SHELL_BROWSER_SIGNAL_SHELL_PARSED);
+    break;
+  case SB_MODE_PRINT:
+    write_to( sb, CONSOLE_EP, &data, sizeof( data));
+    break;
+  }
 } 
 
 enum intern_signal{ PARSED_INPUT, ALTPOS_CHANGED };
@@ -233,17 +241,6 @@ static void handle_intern_signal(const struct shell_browser* sb, enum intern_sig
   uint32_t out_nd = out_buf->max_size;
   *ct_ = *ct;  // save the context before the new one 
   *ct = p->ct;
-      /*
-	printk( " ct:");
-	switch (ct)
-	{
-        case Prompt: printk("Prompt"); break;
-        case PromptMatched: printk("PromptMatched"); break;
-        case Cmd: printk("Cmd"); break;
-        case AltOrOut: printk("AltOrOut"); break;
-        case Alt: printk("Alt"); break;
-        case Out: printk("Out"); break;
-      } */
   const bool newPrompt = 
     ( *ct == PromptMatched 
       && ! (cmd_buf->size > 0 && cmd_buf->buffer[ cmd_buf->size-1] == ' ') );
@@ -329,8 +326,6 @@ static void kill_handler( const struct shell_browser *sb)
   k_thread_abort( k_current_get());
 }
 
-//typedef void (*shell_browser_signal_handler_t)( struct shell_browser* sb);
-
 void shell_browser_process( const struct shell_browser *sb,
 			    shell_browser_signal_handler_t handler)
 {
@@ -371,10 +366,6 @@ void shell_browser_thread(void *sb_handle, void *, void *)
     err = k_poll( sb->ctx->events, SHELL_BROWSER_SIGNAL_CONSOLE_TX_DONE,
 		  K_FOREVER);
     if (err != 0) {
-      //k_mutex_lock(&shell_browser->ctx->wr_mtx, K_FOREVER);
-      //z_shell_fprintf(shell, SHELL_ERROR,
-      //"Shell thread error: %d", err);
-      //k_mutex_unlock(&shell_browser->ctx->wr_mtx);
        return;
     }
     k_mutex_lock(&sb->ctx->wr_mtx, K_FOREVER);
@@ -383,10 +374,6 @@ void shell_browser_thread(void *sb_handle, void *, void *)
     shell_browser_signal_handle( sb, SHELL_BROWSER_SIGNAL_SHELL_RX_RDY, shell_browser_process_shell);
     shell_browser_signal_handle( sb, SHELL_BROWSER_SIGNAL_SHELL_PARSED, shell_browser_process_parsed);
     shell_browser_signal_handle( sb, SHELL_BROWSER_SIGNAL_ALT_POS_CHANGED, shell_browser_process_altpos);
-    /* for( size_t i = 0; i < SHELL_BROWSER_SIGNAL_CONSOLE_TX_DONE; ++i) { */
-    /*   sb->ctx->events[i].signal->signaled = 0; */
-    /*   sb->ctx->events[i].state = K_POLL_STATE_NOT_READY; */
-    /* }       */
     k_mutex_unlock(&sb->ctx->wr_mtx);
   }
 }
@@ -394,8 +381,7 @@ void shell_browser_thread(void *sb_handle, void *, void *)
 static int instance_init( const struct shell_browser *sb,
 			  const void *config)
 {
-  printk("shell_browser instance_init\n");
-  //memset( sb->ctx, 0, sizeof(*sb->ctx));
+  // printk("shell_browser instance_init\n");
   sb->ctx->prompt = sb->default_prompt;
 
   k_mutex_init( &sb->ctx->wr_mtx);
@@ -419,7 +405,6 @@ static int instance_init( const struct shell_browser *sb,
 int shell_browser_init( const struct shell_browser *sb,
 		        const void *config)
 {
-  //printk("->shell_browser_init\n");
   __ASSERT_NO_MSG( sb);
   __ASSERT_NO_MSG( sb->ctx && sb->iface);
   
@@ -435,7 +420,5 @@ int shell_browser_init( const struct shell_browser *sb,
   
   sb->ctx->tid = tid;
   k_thread_name_set(tid, sb->thread_name);
-  //printk("<-shell_browser_init\n");
-  
   return 0;
 }
